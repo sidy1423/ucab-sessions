@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% if is_edit %}{% trans "Modifier la séance" %}{% else %}{% trans "Nouvelle séance" %}{% endif %}
+{% if is_edit and session and session.status == "draft" %}
+  <hr>
+  <div class="alert alert-warning">
+    <strong>⚠️ {% trans "Séance non envoyée" %}:</strong>
+    {% trans "Cette séance est encore en brouillon." %}
+  </div>
+  <form method="post" action="{% url 'academics:director_session_review' session.pk %}"
+        style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="approve">
+    <button class="btn btn-success">
+      ✅ {% trans "Approuver directement" %}
+    </button>
+  </form>
+  <small class="text-muted d-block mt-2">
+    {% trans "En tant que directeur, vous pouvez approuver une séance ancienne." %}
+  </small>
+{% endif %}
+
+
+<div class="mt-4">
+  <a href="{% url 'academics:dashboard' %}" class="btn btn-outline-secondary">
+    ← {% trans "Retour au tableau de bord" %}
+  </a>
+</div>
+
+{% endblock %}
+{% block content %}
+<h3>{% if is_edit %}{% trans "Modifier la séance" %}{% else %}{% trans "Nouvelle séance" %}{% endif %}</h3>
+
+{% if form.non_field_errors %}
+  <div class="alert alert-danger">{{ form.non_field_errors|striptags }}</div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div class="mb-3">
+      <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+      {{ field }}
+      {% if field.errors %}
+        <div class="text-danger small">{{ field.errors|striptags }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button class="btn btn-primary">{% trans "Enregistrer" %}</button>
+  <a href="{% url 'academics:dashboard' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+</form>
+
+{% if is_edit and session and session.status == "draft" %}
+  <hr>
+  <div class="alert alert-warning">
+    <strong>⚠️ {% trans "Séance non envoyée" %}:</strong>
+    {% trans "Cette séance est encore en brouillon." %}
+  </div>
+  <form method="post" action="{% url 'academics:director_session_review' session.pk %}"
+        style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="approve">
+    <button class="btn btn-success">
+      ✅ {% trans "Approuver directement" %}
+    </button>
+  </form>
+  <small class="text-muted d-block mt-2">
+    {% trans "En tant que directeur, vous pouvez approuver une séance ancienne." %}
+  </small>
+{% endif %}
+
+{% endblock %}

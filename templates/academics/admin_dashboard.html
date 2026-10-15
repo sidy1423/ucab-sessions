@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Administrateur" %}{% endblock %}
+{% block content %}
+<h3>{% trans "Tableau de bord — Administrateur Système" %}</h3>
+
+<div class="alert alert-danger">
+  <strong>⚠️ {% trans "Zone sensible" %}:</strong>
+  {% trans "Vous avez tous les droits, y compris la suppression. Utilisez avec précaution." %}
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-muted">{% trans "Utilisateurs" %}</h6>
+    <h3>{{ total_users }}</h3>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-muted">{% trans "Affectations" %}</h6>
+    <h3>{{ total_assignments }}</h3>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-muted">{% trans "Séances" %}</h6>
+    <h3>{{ total_sessions }}</h3>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-success">{% trans "Approuvées" %}</h6>
+    <h3 class="text-success">{{ total_approved }}</h3>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-warning">{% trans "En attente" %}</h6>
+    <h3 class="text-warning">{{ total_pending }}</h3>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body">
+    <h6 class="text-danger">{% trans "Rejetées" %}</h6>
+    <h3 class="text-danger">{{ total_rejected }}</h3>
+  </div></div></div>
+</div>
+
+<div class="alert alert-info">
+  <strong>{% trans "Total heures approuvées" %}:</strong> {{ total_hours }} h
+</div>
+
+<h4>{% trans "Utilisateurs du système" %}</h4>
+<table class="table table-sm table-striped">
+  <thead><tr>
+    <th>{% trans "Nom d'utilisateur" %}</th>
+    <th>{% trans "Nom affiché" %}</th>
+    <th>{% trans "Rôle" %}</th>
+    <th>{% trans "Superuser" %}</th>
+    <th>{% trans "Actif" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for u in users_list %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>{{ u.display_name_fr|default:"—" }}</td>
+        <td><span class="badge bg-secondary">{{ u.get_role_display }}</span></td>
+        <td>{% if u.is_superuser %}✅{% else %}—{% endif %}</td>
+        <td>{% if u.is_active %}✅{% else %}❌{% endif %}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h4 class="mt-4">{% trans "Progression des matières" %}</h4>
+<table class="table table-striped">
+  <thead><tr>
+    <th>{% trans "Enseignant" %}</th><th>{% trans "Matière" %}</th>
+    <th>{% trans "Niveau" %}</th><th>{% trans "Planifié" %}</th>
+    <th>{% trans "Fait" %}</th><th>{% trans "Reste" %}</th><th>{% trans "Progression" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for p in assignments_progress %}
+      <tr>
+        <td>{{ p.assignment.teacher }}</td>
+        <td>{{ p.assignment.subject }}</td>
+        <td>{{ p.assignment.level }}</td>
+        <td>{{ p.planned }} h</td>
+        <td class="text-success">{{ p.done }} h</td>
+        <td class="text-danger">{{ p.remaining }} h</td>
+        <td>
+          <div class="progress" style="min-width:100px">
+            <div class="progress-bar bg-success" style="width: {{ p.percent }}%">
+              {{ p.percent }}%
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h4 class="mt-4">{% trans "Dernières séances" %} <small class="text-danger">({% trans "suppression possible" %})</small></h4>
+<table class="table table-sm">
+  <thead><tr>
+    <th>{% trans "Date" %}</th><th>{% trans "Enseignant" %}</th>
+    <th>{% trans "Matière" %}</th><th>{% trans "Statut" %}</th>
+    <th>{% trans "Action" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for s in recent %}
+      <tr>
+        <td>{{ s.date }}</td>
+        <td>{{ s.teacher }}</td>
+        <td>{{ s.subject }}</td>
+        <td>
+          {% if s.status == "draft" %}<span class="badge bg-secondary">Brouillon</span>
+          {% elif s.status == "submitted" %}<span class="badge bg-warning text-dark">En attente</span>
+          {% elif s.status == "approved" %}<span class="badge bg-success">Approuvée</span>
+          {% elif s.status == "rejected" %}<span class="badge bg-danger">Rejetée</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{% url 'academics:admin_session_delete' s.pk %}"
+                onsubmit="return confirm('{% trans "Confirmer la suppression définitive ?" %}');">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-danger">🗑️ {% trans "Supprimer" %}</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">{% trans "Aucune séance." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="/admin/" class="btn btn-outline-secondary mt-3">
+  ⚙️ {% trans "Django Admin" %}
+</a>
+{% endblock %}

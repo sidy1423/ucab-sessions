@@ -1,0 +1,41 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Notifications" %}
+<div class="mt-4">
+  <a href="{% url 'academics:dashboard' %}" class="btn btn-outline-secondary">
+    ← {% trans "Retour au tableau de bord" %}
+  </a>
+</div>
+
+{% endblock %}
+{% block content %}
+<h3>{% trans "Mes notifications" %}</h3>
+
+{% if notifications %}
+  <div class="list-group">
+    {% for n in notifications %}
+      <a href="{% url 'academics:notification_open' n.pk %}"
+         class="list-group-item list-group-item-action {% if not n.is_read %}list-group-item-info{% endif %}">
+        <div class="d-flex justify-content-between">
+          <div>
+            {% if n.type == "session_submitted" %}📤
+            {% elif n.type == "session_approved" %}✅
+            {% elif n.type == "session_rejected" %}❌
+            {% elif n.type == "session_deleted" %}🗑️
+            {% endif %}
+            <strong>{{ n.get_type_display }}</strong>
+            <div class="small text-muted">{{ n.message }}</div>
+          </div>
+          <small class="text-muted">{{ n.created_at|date:"Y-m-d H:i" }}</small>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info">{% trans "Aucune notification." %}</div>
+{% endif %}
+
+<a href="{% url 'academics:dashboard' %}" class="btn btn-secondary mt-3">
+  ← {% trans "Retour" %}
+</a>
+{% endblock %}

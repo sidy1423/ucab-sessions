@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{{ teacher }} — {% trans "Détail des heures" %}{% endblock %}
+{% block content %}
+<h3>{{ teacher }} — {% trans "Détail des heures" %}</h3>
+
+<p><strong>{% trans "Total" %}:</strong> {{ hours.total_hours }} {% trans "heures" %}</p>
+
+<h5>{% trans "Répartition par niveau" %}</h5>
+<ul>
+  {% for lid, info in hours.by_level.items %}
+    <li>{{ info.name }} — {{ info.hours }} {% trans "heures" %}</li>
+  {% empty %}
+    <li>{% trans "Aucune donnée." %}</li>
+  {% endfor %}
+</ul>
+
+<h5>{% trans "Séances détaillées" %}</h5>
+<table class="table table-striped">
+  <thead><tr>
+    <th>{% trans "Date" %}</th><th>{% trans "Matière" %}</th>
+    <th>{% trans "Niveau" %}</th><th>{% trans "Heures" %}</th><th>{% trans "Sujet" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for s in sessions %}
+      <tr>
+        <td>{{ s.date }}</td><td>{{ s.subject }}</td>
+        <td>{{ s.level }}</td><td>{{ s.duration_hours }}</td><td>{{ s.topic }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">{% trans "Aucune séance." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{% url 'academics:accountant_dashboard' %}" class="btn btn-secondary">{% trans "Retour" %}</a>
+{% endblock %}

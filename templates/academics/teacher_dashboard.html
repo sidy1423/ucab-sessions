@@ -1,0 +1,85 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Mes affectations" %}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">{% trans "Mes affectations" %}</h3>
+  <div>
+    <span class="badge bg-success fs-6">{{ total_hours }} h {% trans "approuvées" %}</span>
+    {% if pending %}<span class="badge bg-warning text-dark fs-6">{{ pending }} {% trans "en attente" %}</span>{% endif %}
+  </div>
+</div>
+
+<table class="table table-striped">
+  <thead><tr>
+    <th>{% trans "Matière" %}</th><th>{% trans "Niveau" %}</th>
+    <th>{% trans "Jour" %}</th><th>{% trans "Heure" %}</th>
+    <th>{% trans "Planifié" %}</th><th>{% trans "Fait" %}</th><th>{% trans "Reste" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for a in assignments %}
+      <tr>
+        <td>{{ a.subject }}</td><td>{{ a.level }}</td>
+        <td>{{ a.get_weekday_display }}</td><td>{{ a.start_time }}</td>
+        <td>{{ a.planned_hours }} h</td>
+        <td class="text-success fw-bold">{{ a.completed_hours }} h</td>
+        <td class="text-danger">{{ a.remaining_hours }} h</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">{% trans "Aucune affectation." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{% url 'academics:teacher_session_create' %}" class="btn btn-success mb-4">
+  ➕ {% trans "Documenter une séance" %}
+</a>
+
+<h4>{% trans "Mes dernières séances" %}</h4>
+<table class="table">
+  <thead><tr>
+    <th>{% trans "Date" %}</th><th>{% trans "Matière" %}</th><th>{% trans "Sujet" %}</th>
+    <th>{% trans "Statut" %}</th><th style="min-width:220px">{% trans "Actions" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for s in sessions %}
+      <tr>
+        <td>{{ s.date }}</td><td>{{ s.subject }}</td><td>{{ s.topic }}</td>
+        <td>
+          {% if s.status == "draft" %}<span class="badge bg-secondary">{% trans "Brouillon" %}</span>
+          {% elif s.status == "submitted" %}<span class="badge bg-warning text-dark">{% trans "En attente" %}</span>
+          {% elif s.status == "approved" %}<span class="badge bg-success">{% trans "Approuvée" %}</span>
+          {% elif s.status == "rejected" %}<span class="badge bg-danger">{% trans "Rejetée" %}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if s.status == "draft" or s.status == "rejected" %}
+            <a class="btn btn-sm btn-primary" href="{% url 'academics:teacher_session_edit' s.pk %}">
+              ✏️ {% trans "Modifier" %}
+            </a>
+            <form method="post" action="{% url 'academics:teacher_session_submit' s.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-success">
+                📤 {% trans "Envoyer" %}
+              </button>
+            </form>
+          {% elif s.status == "submitted" %}
+            <span class="text-muted small">{% trans "En attente de validation..." %}</span>
+          {% elif s.status == "approved" %}
+            <span class="text-success small">✅ {% trans "Validée" %}</span>
+          {% endif %}
+
+          {% if s.status == "rejected" and s.rejection_reason %}
+            <div class="small text-danger mt-1">
+              <strong>{% trans "Motif" %}:</strong> {{ s.rejection_reason }}
+            </div>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">{% trans "Aucune séance." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

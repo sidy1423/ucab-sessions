@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Doyen" %}{% endblock %}
+{% block content %}
+<h3>{% trans "Tableau de bord — Doyen" %}</h3>
+
+<div class="row mb-4">
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <h5 class="text-muted">{% trans "Affectations" %}</h5>
+    <h2>{{ total_assignments }}</h2>
+  </div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <h5 class="text-muted">{% trans "Séances totales" %}</h5>
+    <h2>{{ total_sessions }}</h2>
+  </div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <h5 class="text-success">{% trans "Approuvées" %}</h5>
+    <h2 class="text-success">{{ total_approved }}</h2>
+  </div></div></div>
+  <div class="col-md-3"><div class="card text-center"><div class="card-body">
+    <h5 class="text-warning">{% trans "En attente" %}</h5>
+    <h2 class="text-warning">{{ total_pending }}</h2>
+  </div></div></div>
+</div>
+
+<div class="alert alert-info">
+  <strong>{% trans "Total heures approuvées" %}:</strong> {{ total_hours }} h
+</div>
+
+<h4>{% trans "Progression des matières" %}</h4>
+<table class="table table-striped">
+  <thead><tr>
+    <th>{% trans "Enseignant" %}</th><th>{% trans "Matière" %}</th>
+    <th>{% trans "Niveau" %}</th><th>{% trans "Planifié" %}</th>
+    <th>{% trans "Fait" %}</th><th>{% trans "Reste" %}</th><th>{% trans "Progression" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for p in assignments_progress %}
+      <tr>
+        <td>{{ p.assignment.teacher }}</td>
+        <td>{{ p.assignment.subject }}</td>
+        <td>{{ p.assignment.level }}</td>
+        <td>{{ p.planned }} h</td>
+        <td class="text-success">{{ p.done }} h</td>
+        <td class="text-danger">{{ p.remaining }} h</td>
+        <td>
+          <div class="progress" style="min-width:100px">
+            <div class="progress-bar bg-success" style="width: {{ p.percent }}%">
+              {{ p.percent }}%
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">{% trans "Aucune donnée." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h4>{% trans "Dernières séances" %}</h4>
+<table class="table">
+  <thead><tr>
+    <th>{% trans "Date" %}</th><th>{% trans "Enseignant" %}</th>
+    <th>{% trans "Matière" %}</th><th>{% trans "Sujet" %}</th><th>{% trans "Statut" %}</th>
+  </tr></thead>
+  <tbody>
+    {% for s in recent %}
+      <tr>
+        <td>{{ s.date }}</td><td>{{ s.teacher }}</td>
+        <td>{{ s.subject }}</td><td>{{ s.topic }}</td>
+        <td>
+          {% if s.status == "draft" %}<span class="badge bg-secondary">Brouillon</span>
+          {% elif s.status == "submitted" %}<span class="badge bg-warning text-dark">En attente</span>
+          {% elif s.status == "approved" %}<span class="badge bg-success">Approuvée</span>
+          {% elif s.status == "rejected" %}<span class="badge bg-danger">Rejetée</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">{% trans "Aucune séance." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

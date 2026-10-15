@@ -1,0 +1,236 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Comptable" %}{% endblock %}
+{% block content %}
+<h3>{% trans "Tableau de bord — Comptable" %}</h3>
+
+{# ============ نموذج الفلترة العام (تاريخ) ============ #}
+<form method="get" class="row g-2 mb-4 align-items-end">
+  <div class="col-auto">
+    <label class="form-label">{% trans "Du" %}</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Au" %}</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+  </div>
+
+  {# نحتفظ بفلاتر الجدول التفصيلي #}
+  <input type="hidden" name="teacher" value="{{ f_teacher }}">
+  <input type="hidden" name="level" value="{{ f_level }}">
+  <input type="hidden" name="subject" value="{{ f_subject }}">
+
+  <div class="col-auto">
+    <button class="btn btn-primary">🔍 {% trans "Filtrer" %}</button>
+  </div>
+  {% if date_from or date_to or filters_active %}
+    <div class="col-auto">
+      <a href="{% url 'academics:accountant_dashboard' %}" class="btn btn-outline-secondary">
+        ✖ {% trans "Réinitialiser tout" %}
+      </a>
+    </div>
+  {% endif %}
+</form>
+
+{% if date_from or date_to %}
+  <div class="alert alert-info">
+    {% trans "Période" %}:
+    {% if date_from %}<strong>{% trans "du" %} {{ date_from }}</strong>{% endif %}
+    {% if date_to %}<strong>{% trans "au" %} {{ date_to }}</strong>{% endif %}
+  </div>
+{% endif %}
+
+{# ============ 1) Heures par enseignant ============ #}
+<h4>{% trans "Heures par enseignant" %}</h4>
+<table class="table table-bordered">
+  <thead class="table-light"><tr>
+    <th>{% trans "Enseignant" %}</th>
+    <th class="text-center">{% trans "Total heures" %}</th>
+    <th></th>
+  </tr></thead>
+  <tbody>
+    {% for th in teachers_hours %}
+      <tr>
+        <td>{{ th.teacher_name }}</td>
+        <td class="text-center fw-bold">{{ th.total_hours }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary"
+             href="{% url 'academics:accountant_teacher_detail' th.teacher_id %}?date_from={{ date_from }}&date_to={{ date_to }}">
+            {% trans "Détails" %}
+          </a>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3">{% trans "Aucune donnée." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{# ============ 2) Détail par niveau ============ #}
+<h4 class="mt-4">{% trans "Détail par niveau" %}</h4>
+<table class="table table-bordered table-hover">
+  <thead class="table-success">
+    <tr>
+      <th>{% trans "Niveau" %}</th>
+      <th class="text-center">{% trans "Planifié" %}<br><small>(h)</small></th>
+      <th class="text-center">{% trans "Séances prévues" %}</th>
+      <th class="text-center">{% trans "Fait" %}<br><small>(h)</small></th>
+      <th class="text-center">{% trans "Séances faites" %}</th>
+      <th class="text-center">{% trans "Reste" %}<br><small>(h)</small></th>
+      <th style="min-width:150px">{% trans "Progression" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for lv in levels_summary %}
+      <tr>
+        <td class="fw-bold">{{ lv.name }}</td>
+        <td class="text-center text-primary fw-bold">{{ lv.planned_hours }} h</td>
+        <td class="text-center">{{ lv.planned_sessions }}</td>
+        <td class="text-center text-success fw-bold">{{ lv.completed_hours }} h</td>
+        <td class="text-center">{{ lv.completed_sessions }}</td>
+        <td class="text-center text-danger fw-bold">{{ lv.remaining_hours }} h</td>
+        <td>
+          {% if lv.planned_hours > 0 %}
+            <div class="progress" style="height: 22px;">
+              <div class="progress-bar {% if lv.percent >= 100 %}bg-success{% elif lv.percent > 0 %}bg-warning{% else %}bg-secondary{% endif %}"
+                   style="width: {{ lv.percent }}%">
+                {{ lv.percent }}%
+              </div>
+            </div>
+          {% else %}
+            <span class="text-muted small">—</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center">{% trans "Aucun niveau enregistré." %}</td></tr>
+    {% endfor %}
+  </tbody>
+  <tfoot class="table-warning fw-bold">
+    <tr>
+      <td>{% trans "TOTAL" %}</td>
+      <td class="text-center">{{ grand_total.planned_hours }} h</td>
+      <td class="text-center">{{ grand_total.planned_sessions }}</td>
+      <td class="text-center text-success">{{ grand_total.completed_hours }} h</td>
+      <td class="text-center">{{ grand_total.completed_sessions }}</td>
+      <td class="text-center text-danger">{{ grand_total.remaining_hours }} h</td>
+      <td>
+        <div class="progress" style="height: 22px;">
+          <div class="progress-bar bg-success" style="width: {{ grand_total.percent }}%">
+            {{ grand_total.percent }}%
+          </div>
+        </div>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+{# ============ 3) تفصيل: كل معلم × كل مستوى مع فلترة ============ #}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h4 class="mb-0">{% trans "Détail par enseignant et par niveau" %}</h4>
+  <small class="text-muted">
+    {{ breakdown|length }} {% trans "ligne(s)" %}
+  </small>
+</div>
+
+{# نموذج فلترة الجدول التفصيلي #}
+<form method="get" class="row g-2 mb-3 align-items-end p-3 bg-light rounded border">
+  {# نحتفظ بفلتر التاريخ #}
+  <input type="hidden" name="date_from" value="{{ date_from }}">
+  <input type="hidden" name="date_to" value="{{ date_to }}">
+
+  <div class="col-md-3">
+    <label class="form-label small">{% trans "Enseignant" %}</label>
+    <select name="teacher" class="form-select form-select-sm">
+      <option value="">— {% trans "Tous" %} —</option>
+      {% for t in teachers_list %}
+        <option value="{{ t.id }}" {% if f_teacher == t.id|stringformat:"s" %}selected{% endif %}>
+          {{ t }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label small">{% trans "Matière" %}</label>
+    <select name="subject" class="form-select form-select-sm">
+      <option value="">— {% trans "Toutes" %} —</option>
+      {% for s in subjects_list %}
+        <option value="{{ s.id }}" {% if f_subject == s.id|stringformat:"s" %}selected{% endif %}>
+          {{ s.name_fr }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label small">{% trans "Niveau" %}</label>
+    <select name="level" class="form-select form-select-sm">
+      <option value="">— {% trans "Tous" %} —</option>
+      {% for l in levels_list %}
+        <option value="{{ l.id }}" {% if f_level == l.id|stringformat:"s" %}selected{% endif %}>
+          {{ l.name_fr }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <button class="btn btn-sm btn-success w-100">🔍 {% trans "Filtrer le détail" %}</button>
+  </div>
+</form>
+
+{% if filters_active %}
+  <div class="alert alert-warning small">
+    {% trans "Filtres actifs sur le détail" %}:
+    {% if f_teacher %}<span class="badge bg-info">Enseignant</span>{% endif %}
+    {% if f_subject %}<span class="badge bg-info">Matière</span>{% endif %}
+    {% if f_level %}<span class="badge bg-info">Niveau</span>{% endif %}
+    <a href="?date_from={{ date_from }}&date_to={{ date_to }}" class="ms-2">✖ {% trans "Effacer les filtres du détail" %}</a>
+  </div>
+{% endif %}
+
+<table class="table table-bordered table-sm">
+  <thead class="table-light">
+    <tr>
+      <th>{% trans "Enseignant" %}</th>
+      <th>{% trans "Matière" %}</th>
+      <th>{% trans "Niveau" %}</th>
+      <th class="text-center">{% trans "Planifié" %}</th>
+      <th class="text-center">{% trans "Séances prévues" %}</th>
+      <th class="text-center">{% trans "Fait" %}</th>
+      <th class="text-center">{% trans "Séances faites" %}</th>
+      <th class="text-center">{% trans "Reste" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in breakdown %}
+      <tr>
+        <td>{{ b.teacher }}</td>
+        <td>{{ b.subject }}</td>
+        <td>{{ b.level }}</td>
+        <td class="text-center text-primary">{{ b.planned_hours }} h</td>
+        <td class="text-center">{{ b.planned_sessions }}</td>
+        <td class="text-center text-success fw-bold">{{ b.completed_hours }} h</td>
+        <td class="text-center">{{ b.completed_sessions }}</td>
+        <td class="text-center text-danger">{{ b.remaining_hours }} h</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" class="text-center text-muted">{% trans "Aucune donnée avec ces filtres." %}</td></tr>
+    {% endfor %}
+  </tbody>
+  {% if breakdown %}
+    <tfoot class="table-warning fw-bold">
+      <tr>
+        <td colspan="3">{% trans "TOTAL (filtré)" %}</td>
+        <td class="text-center">{{ breakdown_totals.planned_hours }} h</td>
+        <td class="text-center">{{ breakdown_totals.planned_sessions }}</td>
+        <td class="text-center text-success">{{ breakdown_totals.completed_hours }} h</td>
+        <td class="text-center">{{ breakdown_totals.completed_sessions }}</td>
+        <td class="text-center text-danger">{{ breakdown_totals.remaining_hours }} h</td>
+      </tr>
+    </tfoot>
+  {% endif %}
+</table>
+
+{% endblock %}

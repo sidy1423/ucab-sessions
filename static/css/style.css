@@ -1,0 +1,167 @@
+/* ============================================================
+   ألوان جامعة الشيخ أحمد بمب (UCAB) — مستوحاة من الشعار
+   ============================================================ */
+:root {
+    --ucab-green-dark:  #1a5e20;   /* الأخضر الداكن */
+    --ucab-green:       #2e7d32;   /* الأخضر المتوسط */
+    --ucab-green-light: #4caf50;   /* الأخضر الفاتح */
+    --ucab-gold:        #f4b400;   /* الذهبي */
+    --ucab-gold-light:  #ffd54f;   /* الذهبي الفاتح */
+    --ucab-purple:      #7b3fa0;   /* البنفسجي */
+    --ucab-cream:       #f7f4e9;   /* الكريمي (الخلفية) */
+    --ucab-dark-text:   #1b1b1b;
+}
+
+body {
+    background-color: var(--ucab-cream);
+    color: var(--ucab-dark-text);
+    padding-bottom: 40px;
+    font-family: "Segoe UI", "Tahoma", "Amiri", sans-serif;
+}
+
+/* ---------- Navbar ---------- */
+.navbar-ucab {
+    background: linear-gradient(135deg, var(--ucab-green-dark) 0%, var(--ucab-green) 100%) !important;
+    border-bottom: 4px solid var(--ucab-gold);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.navbar-ucab .navbar-brand {
+    color: #fff !important;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.navbar-ucab .navbar-brand img {
+    height: 56px;
+    width: 56px;
+    border-radius: 50%;
+    background: #fff;
+    padding: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.navbar-ucab .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.navbar-ucab .brand-text .uni-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.navbar-ucab .brand-text .fac-name {
+    font-size: 0.72rem;
+    color: var(--ucab-gold-light);
+    opacity: 0.95;
+}
+
+/* ---------- Cards ---------- */
+.card {
+    border: none;
+    border-top: 4px solid var(--ucab-green);
+    box-shadow: 0 4px 14px rgba(26, 94, 32, 0.12);
+    border-radius: 10px;
+}
+
+.card-title {
+    color: var(--ucab-green-dark);
+    font-weight: 700;
+}
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+    background-color: var(--ucab-green) !important;
+    border-color: var(--ucab-green-dark) !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+.btn-primary:hover {
+    background-color: var(--ucab-green-dark) !important;
+}
+
+.btn-success {
+    background-color: var(--ucab-green-light) !important;
+    border-color: var(--ucab-green) !important;
+}
+
+.btn-warning {
+    background-color: var(--ucab-gold) !important;
+    border-color: var(--ucab-gold) !important;
+    color: #1b1b1b !important;
+    font-weight: 600;
+}
+
+.btn-secondary {
+    background-color: #6c757d !important;
+}
+
+/* ---------- Tables ---------- */
+.table thead {
+    background-color: var(--ucab-green-dark);
+    color: #fff;
+}
+
+.table thead th {
+    border-color: var(--ucab-green-dark);
+    font-weight: 600;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(46, 125, 50, 0.05);
+}
+
+/* ---------- Headings ---------- */
+h3, h4, h5 {
+    color: var(--ucab-green-dark);
+    font-weight: 700;
+}
+
+h3 {
+    border-bottom: 3px solid var(--ucab-gold);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+}
+
+/* ---------- Alerts ---------- */
+.alert-success {
+    background-color: #d4edda;
+    border-color: var(--ucab-green-light);
+    color: var(--ucab-green-dark);
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+}
+
+/* ---------- Badges ---------- */
+.badge.bg-success { background-color: var(--ucab-green) !important; }
+.badge.bg-secondary { background-color: #6c757d !important; }
+.badge.bg-warning {
+    background-color: var(--ucab-gold) !important;
+    color: #1b1b1b !important;
+}
+
+/* ---------- Form controls ---------- */
+.form-control:focus, .form-select:focus {
+    border-color: var(--ucab-green);
+    box-shadow: 0 0 0 0.2rem rgba(46, 125, 50, 0.25);
+}
+
+/* ---------- Dropdown اللغة ---------- */
+.lang-switcher .form-select {
+    background-color: rgba(255,255,255,0.95);
+    border: 1px solid var(--ucab-gold);
+    color: var(--ucab-green-dark);
+    font-weight: 600;
+}
+
+/* ---------- RTL adjustments ---------- */
+[dir="rtl"] .navbar-ucab .brand-text { text-align: right; }
+[dir="rtl"] .table thead { text-align: right; }

@@ -1,0 +1,74 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Connexion" %}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-3">{% trans "Connexion" %}</h4>
+
+        {% if form.errors %}
+          <div class="alert alert-danger">
+            {% trans "Identifiants invalides. Veuillez réessayer." %}
+          </div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="id_username" class="form-label">{% trans "Nom d'utilisateur" %}</label>
+            <input type="text" name="username" id="id_username" class="form-control"
+                   placeholder="director1" autocomplete="off" autofocus>
+          </div>
+
+          <div class="mb-3">
+            <label for="id_password" class="form-label">{% trans "Mot de passe" %}</label>
+            <div class="input-group">
+              <input type="password" name="password" id="id_password" class="form-control"
+                     autocomplete="off">
+              <button class="btn btn-outline-secondary" type="button"
+                      id="toggle-password" tabindex="-1">
+                👁️
+              </button>
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-100">{% trans "Se connecter" %}</button>
+        </form>
+
+        <hr>
+        <small class="text-muted">
+          <strong>{% trans "Comptes de test" %}:</strong><br>
+          admin / Admin2026<br>
+          director1 / Test1234<br>
+          secretary1 / Test1234<br>
+          dean1 / Test1234<br>
+          teacher1 / Test1234<br>
+          accountant1 / Test1234
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const pwd = document.getElementById('id_password');
+    const btn = document.getElementById('toggle-password');
+    if (pwd && btn) {
+      btn.addEventListener('click', function () {
+        if (pwd.type === 'password') {
+          pwd.type = 'text';
+          btn.textContent = '🙈';
+        } else {
+          pwd.type = 'password';
+          btn.textContent = '👁️';
+        }
+        pwd.focus();
+      });
+    }
+  });
+</script>
+{% endblock %}

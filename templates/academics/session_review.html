@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Réviser la séance" %}{% endblock %}
+{% block content %}
+<h3>{% trans "Réviser la séance" %}</h3>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <p><strong>{% trans "Enseignant" %}:</strong> {{ session.teacher }}</p>
+    <p><strong>{% trans "Matière" %}:</strong> {{ session.subject }}</p>
+    <p><strong>{% trans "Niveau" %}:</strong> {{ session.level }}</p>
+    <p><strong>{% trans "Date" %}:</strong> {{ session.date }} — {{ session.start_time }}</p>
+    <p><strong>{% trans "Durée" %}:</strong> {{ session.duration_hours }} h</p>
+    <p><strong>{% trans "Sujet" %}:</strong> {{ session.topic }}</p>
+    {% if session.notes %}
+      <p><strong>{% trans "Remarques" %}:</strong> {{ session.notes }}</p>
+    {% endif %}
+    <p><strong>{% trans "Statut" %}:</strong>
+      {% if session.status == "submitted" %}<span class="badge bg-warning text-dark">{% trans "En attente" %}</span>
+      {% elif session.status == "draft" %}<span class="badge bg-secondary">{% trans "Brouillon" %}</span>
+      {% elif session.status == "approved" %}<span class="badge bg-success">{% trans "Approuvée" %}</span>
+      {% elif session.status == "rejected" %}<span class="badge bg-danger">{% trans "Rejetée" %}</span>
+      {% endif %}
+    </p>
+    {% if session.submitted_at %}
+      <p><strong>{% trans "Envoyée" %}:</strong> {{ session.submitted_at }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <form method="post" class="mb-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="approve">
+      <button class="btn btn-success w-100">✅ {% trans "Approuver" %}</button>
+    </form>
+  </div>
+  <div class="col-md-6">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject">
+      {{ form.as_p }}
+      <button class="btn btn-danger w-100">❌ {% trans "Rejeter" %}</button>
+    </form>
+  </div>
+</div>
+
+{% if user.is_superuser %}
+  <hr>
+  <form method="post" onsubmit="return confirm('{% trans "Confirmer la suppression définitive ?" %}');">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="delete">
+    <button class="btn btn-outline-danger w-100">🗑️ {% trans "Supprimer définitivement" %}</button>
+  </form>
+{% endif %}
+
+<div class="mt-4">
+  <a href="{% url 'academics:director_dashboard' %}" class="btn btn-outline-secondary">
+    ← {% trans "Retour au tableau de bord" %}
+  </a>
+</div>
+{% endblock %}
