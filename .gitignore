@@ -25,3 +25,8 @@ Thumbs.db
 # Project
 _reference/_private/
 *.bak
+# Fichiers sensibles
+*.txt
+Nouveau Document*
+ghp_*
+*.log
