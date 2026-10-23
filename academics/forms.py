@@ -38,3 +38,21 @@ class AssignmentForm(forms.ModelForm):
         fields = ["teacher", "subject", "level", "weekday", "start_time",
                   "duration_hours", "planned_sessions"]
         widgets = {"start_time": forms.TimeInput(attrs={"type": "time"})}
+
+
+class WeeklyScheduleForm(forms.ModelForm):
+    """نموذج إنشاء/تعديل جدول أسبوعي."""
+    class Meta:
+        from .models import WeeklySchedule
+        model = WeeklySchedule
+        fields = [
+            "assignment", "week_start",
+            "new_weekday", "new_start_time", "new_duration", "new_teacher",
+            "reason",
+        ]
+        widgets = {
+            "week_start": forms.DateInput(attrs={"type": "date"}),
+            "new_start_time": forms.TimeInput(attrs={"type": "time"}),
+            "reason": forms.Textarea(attrs={"rows": 2}),
+        }
+

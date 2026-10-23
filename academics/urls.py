@@ -42,4 +42,12 @@ urlpatterns = [
 
     # Finances du doyen
     path("dean/finances/", views.dean_finances, name="dean_finances"),
+    # Horaire hebdomadaire
+    path("secretary/weekly/", views.secretary_weekly_list, name="secretary_weekly_list"),
+    path("secretary/weekly/new/", views.secretary_weekly_create, name="secretary_weekly_create"),
+    path("director/weekly/", views.director_weekly_list, name="director_weekly_list"),
+    path("director/weekly/<int:pk>/delete/", views.director_weekly_delete, name="director_weekly_delete"),
+    # Archive des horaires hebdomadaires
+    path("weekly/archive/", views.weekly_archive, name="weekly_archive"),
+    path("teacher/weekly/", views.teacher_weekly_schedule, name="teacher_weekly_schedule"),
 ]

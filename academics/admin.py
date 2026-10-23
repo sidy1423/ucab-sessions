@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Level, Subject, TeachingAssignment, Session, Payslip
+from .models import Level, Subject, TeachingAssignment, Session, Payslip, WeeklySchedule
 
 @admin.register(Level)
 class LevelAdmin(admin.ModelAdmin):
@@ -31,4 +31,12 @@ class PayslipAdmin(admin.ModelAdmin):
     list_filter = ("status", "year", "month")
     search_fields = ("teacher__display_name_fr",)
     readonly_fields = ("created_at", "updated_at", "paid_at")
+
+
+@admin.register(WeeklySchedule)
+class WeeklyScheduleAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "week_start", "effective_weekday", "effective_start_time", "status", "created_by")
+    list_filter = ("status", "week_start")
+    search_fields = ("assignment__teacher__display_name_fr", "assignment__subject__name_fr")
+    readonly_fields = ("created_at", "updated_at")
 

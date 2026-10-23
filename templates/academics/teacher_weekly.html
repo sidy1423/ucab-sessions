@@ -1,0 +1,60 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Mon horaire" %}{% endblock %}
+{% block content %}
+<h3>📅 {% trans "Mon horaire hebdomadaire" %}</h3>
+<p class="text-muted">{% trans "Vos séances pour les 4 prochaines semaines" %}</p>
+
+{% if upcoming %}
+  {% for week in upcoming %}
+    <div class="card mb-4">
+      <div class="card-header bg-success text-white">
+        <strong>{{ week.label }}</strong> — {{ week.week_start|date:"d/m/Y" }} → {{ week.week_end|date:"d/m/Y" }}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>{% trans "Date" %}</th>
+              <th>{% trans "Jour" %}</th>
+              <th>{% trans "Matière" %}</th>
+              <th>{% trans "Niveau" %}</th>
+              <th class="text-center">{% trans "Début" %}</th>
+              <th class="text-center">{% trans "Fin" %}</th>
+              <th>{% trans "Source" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in week.sessions %}
+              <tr>
+                <td>{{ s.date|date:"d/m/Y" }}</td>
+                <td>{{ s.weekday|stringformat:"d" }}</td>
+                <td>{{ s.subject }}</td>
+                <td>{{ s.level }}</td>
+                <td class="text-center fw-bold text-success">{{ s.start|time:"H:i" }}</td>
+                <td class="text-center fw-bold text-danger">{{ s.end_time|time:"H:i" }}</td>
+                <td>
+                  {% if s.source == "assignment" %}
+                    <span class="badge bg-secondary">{% trans "Régulier" %}</span>
+                  {% elif s.source == "override" %}
+                    <span class="badge bg-info">{% trans "Modifié" %}</span>
+                    {% if s.reason %}<br><small class="text-muted">{{ s.reason }}</small>{% endif %}
+                  {% else %}
+                    <span class="badge bg-warning text-dark">{% trans "Ajouté" %}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info">
+    {% trans "Aucune séance programmée pour les prochaines semaines." %}
+  </div>
+{% endif %}
+
+<a href="{% url 'academics:teacher_dashboard' %}" class="btn btn-outline-secondary mt-3">← {% trans "Retour" %}</a>
+{% endblock %}

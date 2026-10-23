@@ -277,13 +277,29 @@ def director_session_edit(request, pk):
 @login_required
 def secretary_dashboard(request):
     _require_secretary(request.user)
+    from django.contrib.auth import get_user_model
+    from .models import Level, Subject, WeeklySchedule
+    User = get_user_model()
+
     assignments = (TeachingAssignment.objects
                    .select_related("teacher", "subject", "level", "created_by")
                    .order_by("-created_at"))
+
+    weeklies = (WeeklySchedule.objects
+                .select_related("assignment__teacher", "assignment__subject", "created_by")
+                .order_by("-week_start"))
+
+    teachers = User.objects.filter(role=User.Role.TEACHER).order_by("display_name_fr")
+    subjects = Subject.objects.all().order_by("name_fr")
+    levels = Level.objects.all().order_by("order", "name_fr")
+
     return render(request, "academics/secretary_dashboard.html", {
         "assignments": assignments,
+        "weeklies": weeklies,
+        "teachers": teachers,
+        "subjects": subjects,
+        "levels": levels,
     })
-
 
 @login_required
 def secretary_assignment_create(request):
@@ -649,3 +665,239 @@ def notification_open(request, pk):
     if notif.url:
         return redirect(notif.url)
     return redirect("academics:notifications_list")
+
+
+# ============================================================
+# WEEKLY SCHEDULE (Horaire hebdomadaire)
+# ============================================================
+@login_required
+def secretary_weekly_list(request):
+    """قائمة التعديلات الأسبوعية للسكرتير."""
+    _require_secretary(request.user)
+    from .models import WeeklySchedule
+    weeklies = (WeeklySchedule.objects
+                .select_related("assignment__teacher", "assignment__subject", "created_by")
+                .order_by("-week_start"))
+    return render(request, "academics/secretary_weekly_list.html", {
+        "weeklies": weeklies,
+    })
+
+
+@login_required
+def secretary_weekly_create(request):
+    """إنشاء تعديل أسبوعي."""
+    _require_secretary(request.user)
+    from .models import WeeklySchedule
+    from .forms import WeeklyScheduleForm
+    from .services_notifications import notify_weekly_schedule_created
+
+    if request.method == "POST":
+        form = WeeklyScheduleForm(request.POST)
+        if form.is_valid():
+            weekly = form.save(commit=False)
+            weekly.created_by = request.user
+            weekly.status = WeeklySchedule.Status.CONFIRMED
+            weekly.save()
+            # إشعار المدير
+            try:
+                notify_weekly_schedule_created(weekly, request.user)
+            except Exception:
+                pass
+            messages.success(request, _("Horaire hebdomadaire créé."))
+            return redirect("academics:secretary_weekly_list")
+    else:
+        form = WeeklyScheduleForm()
+    return render(request, "academics/secretary_weekly_form.html", {
+        "form": form,
+        "is_edit": False,
+    })
+
+
+@login_required
+def director_weekly_list(request):
+    """قائمة التعديلات الأسبوعية للمدير."""
+    _require_director(request.user)
+    from .models import WeeklySchedule
+    weeklies = (WeeklySchedule.objects
+                .select_related("assignment__teacher", "assignment__subject", "created_by")
+                .order_by("-week_start"))
+    return render(request, "academics/director_weekly_list.html", {
+        "weeklies": weeklies,
+    })
+
+
+@login_required
+def director_weekly_delete(request, pk):
+    """حذف تعديل أسبوعي (المدير فقط)."""
+    _require_director(request.user)
+    from .models import WeeklySchedule
+    w = get_object_or_404(WeeklySchedule, pk=pk)
+    if request.method == "POST":
+        w.delete()
+        messages.success(request, _("Horaire supprimé."))
+    return redirect("academics:director_weekly_list")
+
+
+# ============================================================
+# WEEKLY ARCHIVE — Archive de tous les horaires hebdomadaires
+# ============================================================
+@login_required
+def weekly_archive(request):
+    """صفحة أرشيف كل التعديلات الأسبوعية.
+    متاحة للمدير + السكرتير + العميد.
+    """
+    if not (request.user.is_director or request.user.is_secretary
+            or request.user.is_dean or request.user.is_admin_user):
+        raise PermissionDenied(_("Page réservée au directeur, secrétaire, doyen."))
+
+    from datetime import date, timedelta
+    from .models import WeeklySchedule
+    from django.db.models import Q
+
+    # فلتر الأسبوع
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # الاثنين الحالي
+
+    filter_type = request.GET.get("filter", "all")  # all / past / current / future
+    teacher_id = request.GET.get("teacher", "")
+    level_id = request.GET.get("level", "")
+
+    qs = WeeklySchedule.objects.select_related(
+        "assignment__teacher", "assignment__subject", "assignment__level",
+        "new_teacher", "created_by",
+    ).order_by("-week_start")
+
+    if filter_type == "past":
+        qs = qs.filter(week_start__lt=week_start)
+    elif filter_type == "current":
+        qs = qs.filter(week_start=week_start)
+    elif filter_type == "future":
+        qs = qs.filter(week_start__gt=week_start)
+
+    if teacher_id:
+        try:
+            qs = qs.filter(Q(assignment__teacher_id=int(teacher_id)) | Q(new_teacher_id=int(teacher_id)))
+        except (ValueError, TypeError):
+            pass
+
+    if level_id:
+        try:
+            qs = qs.filter(assignment__level_id=int(level_id))
+        except (ValueError, TypeError):
+            pass
+
+    from django.contrib.auth import get_user_model
+    from .models import Level
+    User = get_user_model()
+    teachers = User.objects.filter(role=User.Role.TEACHER).order_by("display_name_fr")
+    levels = Level.objects.all().order_by("order", "name_fr")
+
+    return render(request, "academics/weekly_archive.html", {
+        "weeklies": qs,
+        "teachers": teachers,
+        "levels": levels,
+        "filter_type": filter_type,
+        "teacher_id": teacher_id,
+        "level_id": level_id,
+        "current_week": week_start,
+        "total": qs.count(),
+    })
+
+
+@login_required
+def teacher_weekly_schedule(request):
+    """جدول المعلم الأسبوعي — يظهر الحصص القادمة."""
+    _require_teacher(request.user)
+
+    from datetime import date, timedelta
+    from .models import WeeklySchedule, TeachingAssignment
+
+    today = date.today()
+    # 4 أسابيع قادمة
+    upcoming = []
+    for week_offset in range(4):
+        week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+        week_end = week_start + timedelta(days=6)
+
+        # التعديلات الأسبوعية
+        overrides = WeeklySchedule.objects.filter(
+            week_start=week_start,
+        ).select_related("assignment__teacher", "assignment__subject", "new_teacher")
+
+        # جمع بين:
+        # 1) إسنادات المعلم الثابتة (بدون تعديل هذا الأسبوع)
+        # 2) التعديلات لهذا الأسبوع (سواء له أو لغيره — لكن نعرض فقط ما يخصه)
+        sessions_this_week = []
+
+        # إسنادات المعلم الثابتة
+        for a in TeachingAssignment.objects.filter(teacher=request.user).select_related("subject", "level"):
+            # هل هناك تعديل لهذا الإسناد هذا الأسبوع؟
+            override = overrides.filter(assignment=a).first()
+            if override:
+                # استخدم قيم التعديل
+                if override.effective_teacher_id != request.user.id:
+                    continue  # تم نقله لمعلم آخر
+                sessions_this_week.append({
+                    "date": week_start + timedelta(days=override.effective_weekday),
+                    "weekday": override.effective_weekday,
+                    "start": override.effective_start_time,
+                    "end_time": override.end_time,
+                    "duration": override.effective_duration,
+                    "subject": a.subject.name_fr,
+                    "level": a.level.name_fr,
+                    "source": "override",
+                    "reason": override.reason,
+                })
+            else:
+                # استخدم القيم الأصلية
+                sessions_this_week.append({
+                    "date": week_start + timedelta(days=a.weekday),
+                    "weekday": a.weekday,
+                    "start": a.start_time,
+                    "end_time": None,  # نحسبها لاحقًا
+                    "duration": a.duration_hours,
+                    "subject": a.subject.name_fr,
+                    "level": a.level.name_fr,
+                    "source": "assignment",
+                    "reason": "",
+                })
+
+        # تعديلات جديدة أضافها السكرتير للمعلم
+        for override in overrides.filter(new_teacher=request.user):
+            if override.assignment.teacher_id == request.user.id:
+                continue  # معالجة مسبقًا
+            sessions_this_week.append({
+                "date": week_start + timedelta(days=override.effective_weekday),
+                "weekday": override.effective_weekday,
+                "start": override.effective_start_time,
+                "end_time": override.end_time,
+                "duration": override.effective_duration,
+                "subject": override.assignment.subject.name_fr,
+                "level": override.assignment.level.name_fr,
+                "source": "added",
+                "reason": override.reason,
+            })
+
+        # احسب end_time يدويًا حيث None
+        from datetime import datetime
+        for s in sessions_this_week:
+            if s["end_time"] is None and s["start"]:
+                dt = datetime.combine(today, s["start"])
+                s["end_time"] = (dt + timedelta(hours=s["duration"])).time()
+
+        # رتب حسب التاريخ
+        sessions_this_week.sort(key=lambda x: (x["date"], x["start"]))
+
+        if sessions_this_week:
+            upcoming.append({
+                "week_start": week_start,
+                "week_end": week_end,
+                "sessions": sessions_this_week,
+                "label": "Cette semaine" if week_offset == 0 else f"Semaine +{week_offset}",
+            })
+
+    return render(request, "academics/teacher_weekly.html", {
+        "upcoming": upcoming,
+        "today": today,
+    })
+

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Horaires hebdomadaires" %}{% endblock %}
+{% block content %}
+<h3>📅 {% trans "Horaires hebdomadaires" %}</h3>
+
+<table class="table table-bordered table-hover">
+  <thead class="table-light">
+    <tr>
+      <th>{% trans "Date de la séance" %}</th>
+      <th>{% trans "Matière" %}</th>
+      <th>{% trans "Enseignant" %}</th>
+      <th>{% trans "Jour" %}</th>
+      <th class="text-center">{% trans "Début" %}</th>
+      <th class="text-center">{% trans "Fin" %}</th>
+      <th>{% trans "Motif" %}</th>
+      <th>{% trans "Créé par" %}</th>
+      <th>{% trans "Actions" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for w in weeklies %}
+      <tr>
+        <td>
+          <strong>{{ w.session_date|date:"d/m/Y" }}</strong><br>
+          <small class="text-muted">({% trans "semaine du" %} {{ w.week_start|date:"d/m/Y" }})</small>
+        </td>
+        <td>{{ w.assignment.subject.name_fr }}</td>
+        <td>{{ w.effective_teacher }}</td>
+        <td>{{ w.get_new_weekday_display|default:w.assignment.get_weekday_display }}</td>
+        <td class="text-center fw-bold text-success">{{ w.effective_start_time|time:"H:i" }}</td>
+        <td class="text-center fw-bold text-danger">{{ w.end_time|time:"H:i" }}</td>
+        <td>{{ w.reason|default:"—" }}</td>
+        <td>{{ w.created_by|default:"—" }}</td>
+        <td>
+          <form method="post" action="{% url 'academics:director_weekly_delete' w.pk %}"
+                onsubmit="return confirm('{% trans "Confirmer la suppression ?" %}');"
+                style="display:inline;">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-danger">🗑️ {% trans "Supprimer" %}</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="text-center">{% trans "Aucun horaire modifié." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{% url 'academics:director_dashboard' %}" class="btn btn-outline-secondary mt-3">
+  ← {% trans "Retour au tableau de bord" %}
+</a>
+{% endblock %}

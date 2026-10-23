@@ -1,0 +1,91 @@
+﻿{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Archive des horaires" %}{% endblock %}
+{% block content %}
+<h3>📚 {% trans "Archive des horaires hebdomadaires" %}</h3>
+<p class="text-muted">{{ total }} {% trans "entrées trouvées" %} — {% trans "semaine actuelle du" %} {{ current_week|date:"d/m/Y" }}</p>
+
+{# ============ Filtres ============ #}
+<form method="get" class="row g-2 mb-4 align-items-end">
+  <div class="col-md-2">
+    <label class="form-label small">{% trans "Période" %}</label>
+    <select name="filter" class="form-select form-select-sm">
+      <option value="all" {% if filter_type == "all" %}selected{% endif %}>— {% trans "Toutes" %} —</option>
+      <option value="past" {% if filter_type == "past" %}selected{% endif %}>📅 {% trans "Passées" %}</option>
+      <option value="current" {% if filter_type == "current" %}selected{% endif %}>📍 {% trans "Cette semaine" %}</option>
+      <option value="future" {% if filter_type == "future" %}selected{% endif %}>⏳ {% trans "Futures" %}</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">{% trans "Enseignant" %}</label>
+    <select name="teacher" class="form-select form-select-sm">
+      <option value="">— {% trans "Tous" %} —</option>
+      {% for t in teachers %}
+        <option value="{{ t.id }}" {% if teacher_id == t.id|stringformat:"s" %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">{% trans "Niveau" %}</label>
+    <select name="level" class="form-select form-select-sm">
+      <option value="">— {% trans "Tous" %} —</option>
+      {% for l in levels %}
+        <option value="{{ l.id }}" {% if level_id == l.id|stringformat:"s" %}selected{% endif %}>{{ l.name_fr }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <button class="btn btn-primary btn-sm w-100">🔍 {% trans "Filtrer" %}</button>
+  </div>
+  <div class="col-md-2">
+    <a href="{% url 'academics:weekly_archive' %}" class="btn btn-outline-secondary btn-sm w-100">✖ {% trans "Reset" %}</a>
+  </div>
+</form>
+
+{# ============ Table ============ #}
+<table class="table table-striped table-hover">
+  <thead class="table-light">
+    <tr>
+      <th>{% trans "Semaine" %}</th>
+      <th>{% trans "Date de la séance" %}</th>
+      <th>{% trans "Matière" %}</th>
+      <th>{% trans "Enseignant" %}</th>
+      <th>{% trans "Niveau" %}</th>
+      <th>{% trans "Jour" %}</th>
+      <th class="text-center">{% trans "Début" %}</th>
+      <th class="text-center">{% trans "Fin" %}</th>
+      <th>{% trans "Motif" %}</th>
+      <th>{% trans "Créé par" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for w in weeklies %}
+      <tr>
+        <td>
+          {{ w.week_start|date:"d/m/Y" }}
+          {% if w.week_start < current_week %}
+            <span class="badge bg-secondary">{% trans "Passée" %}</span>
+          {% elif w.week_start == current_week %}
+            <span class="badge bg-success">{% trans "Actuelle" %}</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{% trans "Future" %}</span>
+          {% endif %}
+        </td>
+        <td><strong>{{ w.session_date|date:"d/m/Y" }}</strong></td>
+        <td>{{ w.assignment.subject.name_fr }}</td>
+        <td>{{ w.effective_teacher }}</td>
+        <td>{{ w.assignment.level.name_fr }}</td>
+        <td>{{ w.get_new_weekday_display|default:w.assignment.get_weekday_display }}</td>
+        <td class="text-center fw-bold text-success">{{ w.effective_start_time|time:"H:i" }}</td>
+        <td class="text-center fw-bold text-danger">{{ w.end_time|time:"H:i" }}</td>
+        <td>{{ w.reason|default:"—" }}</td>
+        <td>{{ w.created_by|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="10" class="text-center">{% trans "Aucun horaire trouvé." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="{% url 'academics:dashboard' %}" class="btn btn-outline-secondary mt-3">← {% trans "Retour" %}</a>
+{% endblock %}

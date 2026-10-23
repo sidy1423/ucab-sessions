@@ -265,6 +265,7 @@ class Notification(models.Model):
         SESSION_DELETED   = "session_deleted",   _("Séance supprimée")
         ASSIGNMENT_CREATED = "assignment_created", _("Affectation créée")
         PAYSLIP_PAID = "payslip_paid", _("Fiche de paie payée")
+        WEEKLY_SCHEDULE_CREATED = "weekly_schedule_created", _("Horaire hebdomadaire modifié")
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -354,4 +355,112 @@ class Payslip(models.Model):
             "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
         ]
         return f"{months_fr[self.month]} {self.year}"
+
+
+class WeeklySchedule(models.Model):
+    """
+    جدول أسبوعي مخصص لتعديل أوقات الحصص.
+    - إذا وُجد سجل لهذا الأسبوع: يستخدم بدلًا من TeachingAssignment.
+    - السكرتير أو المدير ينشئه.
+    - المدير يُشعَر.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Brouillon")
+        CONFIRMED = "confirmed", _("Confirmé")
+
+    assignment = models.ForeignKey(
+        TeachingAssignment, on_delete=models.CASCADE,
+        related_name="weekly_overrides",
+        verbose_name=_("Affectation d'origine"),
+    )
+    week_start = models.DateField(
+        _("Début de la semaine (lundi)"),
+        help_text=_("Date du lundi de la semaine concernée"),
+    )
+
+    # التعديلات (إذا None → يستخدم قيمة الأصل)
+    new_weekday = models.PositiveSmallIntegerField(
+        _("Nouveau jour"), null=True, blank=True,
+    )
+    new_start_time = models.TimeField(
+        _("Nouvelle heure"), null=True, blank=True,
+    )
+    new_duration = models.PositiveSmallIntegerField(
+        _("Nouvelle durée (h)"), null=True, blank=True,
+    )
+    new_teacher = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="weekly_teacher_overrides",
+        verbose_name=_("Nouvel enseignant"),
+    )
+
+    reason = models.TextField(_("Motif"), blank=True)
+    status = models.CharField(
+        _("Statut"), max_length=20,
+        choices=Status.choices, default=Status.DRAFT,
+    )
+    created_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="weekly_created",
+        verbose_name=_("Créé par"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-week_start"]
+        verbose_name = _("Horaire hebdomadaire")
+        verbose_name_plural = _("Horaires hebdomadaires")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assignment", "week_start"],
+                name="uniq_weekly_override",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["week_start"]),
+        ]
+
+    def __str__(self):
+        return f"{self.assignment} — semaine du {self.week_start}"
+
+    # ---- القيم الفعلية ----
+    @property
+    def effective_weekday(self):
+        return self.new_weekday if self.new_weekday is not None else self.assignment.weekday
+
+    @property
+    def effective_start_time(self):
+        return self.new_start_time or self.assignment.start_time
+
+    @property
+    def effective_duration(self):
+        return self.new_duration if self.new_duration else self.assignment.duration_hours
+
+    @property
+    def effective_teacher(self):
+        return self.new_teacher or self.assignment.teacher
+
+    # ---- Calculs automatiques ----
+    @property
+    def end_time(self):
+        """وقت الانتهاء = وقت البداية + مدة الحصة."""
+        from datetime import datetime, timedelta
+        start = self.effective_start_time
+        if not start:
+            return None
+        dt = datetime.combine(datetime.today(), start)
+        return (dt + timedelta(hours=self.effective_duration)).time()
+
+    @property
+    def session_date(self):
+        """تاريخ الحصة = بداية الأسبوع + يوم الحصة."""
+        from datetime import timedelta
+        if self.week_start is None:
+            return None
+        return self.week_start + timedelta(days=self.effective_weekday)
+
 

@@ -150,3 +150,23 @@ def notify_payslip_paid(payslip):
             url=reverse("academics:dean_dashboard"),
         )
 
+
+def notify_weekly_schedule_created(weekly, user):
+    """إشعار المدير عند تعديل السكرتير جدولاً أسبوعيًا."""
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+    User = get_user_model()
+
+    directors = User.objects.filter(role=User.Role.DIRECTOR)
+    message = (
+        f"{user.display_name_fr} a modifié l'horaire de "
+        f"{weekly.assignment.subject.name_fr} pour la semaine du {weekly.week_start}"
+    )
+    for d in directors:
+        _create_notification(
+            recipient=d,
+            notif_type=Notification.Type.WEEKLY_SCHEDULE_CREATED,
+            message=message,
+            url=reverse("academics:director_weekly_list"),
+        )
+
