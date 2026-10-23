@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load i18n %}
 {% block title %}{% trans "Finances" %}{% endblock %}
 {% block content %}
@@ -19,7 +19,7 @@
 </form>
 
 <div class="row mb-4">
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="card text-center border-success">
       <div class="card-body">
         <h6 class="text-success">{% trans "Total payé" %}</h6>
@@ -28,7 +28,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="card text-center border-warning">
       <div class="card-body">
         <h6 class="text-warning">{% trans "Reste à payer" %}</h6>
@@ -37,7 +37,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-md-4">
     <div class="card text-center border-primary">
       <div class="card-body">
         <h6 class="text-primary">{% trans "Total général" %}</h6>

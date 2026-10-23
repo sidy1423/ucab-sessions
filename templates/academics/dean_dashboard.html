@@ -4,6 +4,12 @@
 {% block content %}
 <h3>{% trans "Tableau de bord — Doyen" %}</h3>
 
+<div class="mb-3">
+  <a href="{% url 'academics:dean_finances' %}" class="btn btn-success">
+    💰 {% trans "État financier" %}
+  </a>
+</div>
+
 <div class="row mb-4">
   <div class="col-md-3"><div class="card text-center"><div class="card-body">
     <h5 class="text-muted">{% trans "Affectations" %}</h5>

@@ -4,6 +4,12 @@
 {% block content %}
 <h3>{% trans "Tableau de bord — Comptable" %}</h3>
 
+<div class="mb-3">
+  <a href="{% url 'academics:accountant_payslips' %}" class="btn btn-success">
+    💰 {% trans "Fiches de paie mensuelles" %}
+  </a>
+</div>
+
 {# ============ نموذج الفلترة العام (تاريخ) ============ #}
 <form method="get" class="row g-2 mb-4 align-items-end">
   <div class="col-auto">

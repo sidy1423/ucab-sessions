@@ -15,11 +15,11 @@ from .services import (
     WorkflowError,
     approve_session,
     compute_all_teachers_hours,
+    compute_all_teachers_salaries,
     compute_levels_grand_total,
     compute_levels_summary,
     compute_levels_totals,
     compute_teacher_hours,
-    compute_all_teachers_salaries,
     compute_teacher_level_breakdown,
     compute_total_salaries,
     create_session,
@@ -30,7 +30,9 @@ from .services import (
 )
 
 
-# ---------- التحقق من الصلاحيات ----------
+# ============================================================
+# Helpers
+# ============================================================
 def _require_director(u):
     if not (u.is_authenticated and (u.is_director or u.is_admin_user)):
         raise PermissionDenied(_("Page réservée au directeur des études."))
@@ -56,11 +58,15 @@ def _require_teacher(u):
         raise PermissionDenied(_("Page réservée aux enseignants."))
 
 
-# ---------- لوحة القيادة (توجيه) ----------
+# ============================================================
+# Dashboard redirect
+# ============================================================
 @login_required
 def dashboard(request):
     u = request.user
-    if u.is_admin_user or u.is_director:
+    if u.is_superuser:
+        return redirect("academics:admin_dashboard")
+    if u.is_director:
         return redirect("academics:director_dashboard")
     if u.is_secretary:
         return redirect("academics:secretary_dashboard")
@@ -71,7 +77,9 @@ def dashboard(request):
     return redirect("academics:teacher_dashboard")
 
 
-# ================= المعلم =================
+# ============================================================
+# TEACHER
+# ============================================================
 @login_required
 def teacher_dashboard(request):
     _require_teacher(request.user)
@@ -80,12 +88,10 @@ def teacher_dashboard(request):
                    .select_related("subject", "level"))
 
     all_sessions_qs = Session.objects.filter(teacher=request.user)
-
     pending = all_sessions_qs.filter(status=Session.Status.SUBMITTED).count()
     total_hours = (all_sessions_qs
                    .filter(status=Session.Status.APPROVED)
                    .aggregate(t=Sum("duration_hours"))["t"] or 0)
-
     sessions = (all_sessions_qs
                 .select_related("subject", "level")
                 .order_by("-date", "-start_time")[:30])
@@ -161,28 +167,23 @@ def teacher_session_submit(request, pk):
     return redirect("academics:teacher_dashboard")
 
 
-# ================= مدير الدراسات =================
+# ============================================================
+# DIRECTOR
+# ============================================================
 @login_required
 def director_dashboard(request):
     _require_director(request.user)
-
     pending_sessions = (Session.objects
                         .filter(status=Session.Status.SUBMITTED)
                         .select_related("teacher", "subject", "level")
                         .order_by("submitted_at"))
-
     assignments = (TeachingAssignment.objects
                    .select_related("teacher", "subject", "level")
                    .order_by("teacher__display_name_fr", "weekday", "start_time"))
-
     recent_sessions = (Session.objects
                        .select_related("teacher", "subject", "level")
                        .order_by("-date", "-start_time")[:30])
-
-    teacher_count = (assignments
-                     .values("teacher_id")
-                     .distinct()
-                     .count())
+    teacher_count = (assignments.values("teacher_id").distinct().count())
 
     return render(request, "academics/director_dashboard.html", {
         "pending_sessions": pending_sessions,
@@ -270,7 +271,9 @@ def director_session_edit(request, pk):
                   {"form": form, "is_edit": True, "session": s})
 
 
-# ================= السكرتير =================
+# ============================================================
+# SECRETARY
+# ============================================================
 @login_required
 def secretary_dashboard(request):
     _require_secretary(request.user)
@@ -291,10 +294,12 @@ def secretary_assignment_create(request):
             a = form.save(commit=False)
             a.created_by = request.user
             a.save()
-            # إشعار المدير إذا كان السكرتير هو من أنشأ
             if request.user.is_secretary:
                 from .services_notifications import notify_assignment_created_by_secretary
-                notify_assignment_created_by_secretary(a, request.user)
+                try:
+                    notify_assignment_created_by_secretary(a, request.user)
+                except Exception:
+                    pass
             messages.success(request, _("Affectation créée par le secrétaire."))
             return redirect("academics:secretary_dashboard")
     else:
@@ -303,11 +308,12 @@ def secretary_assignment_create(request):
                   {"form": form, "back_url": "academics:secretary_dashboard"})
 
 
-# ================= العميد =================
+# ============================================================
+# DEAN
+# ============================================================
 @login_required
 def dean_dashboard(request):
     _require_dean(request.user)
-
     total_assignments = TeachingAssignment.objects.count()
     total_sessions = Session.objects.count()
     total_approved = Session.objects.filter(status=Session.Status.APPROVED).count()
@@ -339,12 +345,13 @@ def dean_dashboard(request):
     })
 
 
-# ================= الأدمين =================
+# ============================================================
+# ADMIN
+# ============================================================
 @login_required
 def admin_dashboard(request):
     if not request.user.is_superuser:
         raise PermissionDenied(_("Page réservée à l'administrateur système."))
-
     from django.contrib.auth import get_user_model
     User = get_user_model()
 
@@ -371,7 +378,6 @@ def admin_dashboard(request):
     recent = (Session.objects
               .select_related("teacher", "subject", "level")
               .order_by("-created_at")[:20])
-
     users_list = User.objects.all().order_by("role", "username")
 
     return render(request, "academics/admin_dashboard.html", {
@@ -399,7 +405,9 @@ def admin_session_delete(request, pk):
     return redirect("academics:admin_dashboard")
 
 
-# ================= المحاسب =================
+# ============================================================
+# ACCOUNTANT
+# ============================================================
 @login_required
 def accountant_dashboard(request):
     _require_accountant(request.user)
@@ -423,21 +431,21 @@ def accountant_dashboard(request):
 
     if f_teacher:
         try:
-            f_teacher_id = int(f_teacher)
-            breakdown = [b for b in breakdown if b["teacher"].id == f_teacher_id]
-            salaries = [s for s in salaries if s["teacher_id"] == f_teacher_id]
+            fid = int(f_teacher)
+            breakdown = [b for b in breakdown if b["teacher"].id == fid]
+            salaries = [s for s in salaries if s["teacher_id"] == fid]
         except (ValueError, TypeError):
             pass
     if f_level:
         try:
-            f_level_id = int(f_level)
-            breakdown = [b for b in breakdown if b["level"].id == f_level_id]
+            fid = int(f_level)
+            breakdown = [b for b in breakdown if b["level"].id == fid]
         except (ValueError, TypeError):
             pass
     if f_subject:
         try:
-            f_subject_id = int(f_subject)
-            breakdown = [b for b in breakdown if b["subject"].id == f_subject_id]
+            fid = int(f_subject)
+            breakdown = [b for b in breakdown if b["subject"].id == fid]
         except (ValueError, TypeError):
             pass
 
@@ -508,7 +516,121 @@ def accountant_teacher_detail(request, teacher_id):
     })
 
 
-# ================= الإشعارات =================
+# ============================================================
+# PAYSLIPS (Fiches de paie)
+# ============================================================
+@login_required
+def accountant_payslips(request):
+    """لوحة المحاسب — كشوف الرواتب.
+    متاحة للمحاسب + المدير + العميد + الأدمين.
+    """
+    if not (request.user.is_accountant or request.user.is_director
+            or request.user.is_dean or request.user.is_admin_user):
+        raise PermissionDenied(_("Accès réservé au comptable, directeur, doyen ou administrateur."))
+
+    from datetime import date as d
+    from .models import Payslip
+    from .services import generate_monthly_payslips
+
+    today = d.today()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    if request.method == "POST" and request.POST.get("action") == "generate":
+        try:
+            generate_monthly_payslips(year=year, month=month)
+            messages.success(request, _("Fiches générées."))
+        except Exception as e:
+            messages.error(request, str(e))
+        return redirect(f"{request.path}?year={year}&month={month}")
+
+    payslips = Payslip.objects.filter(year=year, month=month).select_related(
+        "teacher", "paid_by",
+    ).order_by("teacher__display_name_fr")
+
+    total_paid = sum(p.total_amount for p in payslips if p.status == Payslip.Status.PAID)
+    total_pending = sum(p.total_amount for p in payslips if p.status == Payslip.Status.PENDING)
+
+    return render(request, "academics/accountant_payslips.html", {
+        "payslips": payslips,
+        "year": year,
+        "month": month,
+        "total_paid": total_paid,
+        "total_pending": total_pending,
+    })
+
+
+@login_required
+def accountant_payslip_mark_paid(request, pk):
+    if not (request.user.is_accountant or request.user.is_admin_user):
+        raise PermissionDenied(_("Action réservée au comptable."))
+    from .models import Payslip
+    from .services import mark_payslip_as_paid
+
+    p = get_object_or_404(Payslip, pk=pk)
+    if request.method == "POST":
+        try:
+            mark_payslip_as_paid(payslip=p, user=request.user)
+            messages.success(request, _("Fiche marquée payée."))
+        except Exception as e:
+            messages.error(request, str(e))
+    return redirect("academics:accountant_payslips")
+
+
+@login_required
+def accountant_payslip_mark_pending(request, pk):
+    if not (request.user.is_accountant or request.user.is_admin_user):
+        raise PermissionDenied(_("Action réservée au comptable."))
+    from .models import Payslip
+    from .services import mark_payslip_as_pending
+
+    p = get_object_or_404(Payslip, pk=pk)
+    if request.method == "POST":
+        try:
+            mark_payslip_as_pending(payslip=p, user=request.user)
+            messages.success(request, _("Fiche remise en attente."))
+        except Exception as e:
+            messages.error(request, str(e))
+    return redirect("academics:accountant_payslips")
+
+
+# ============================================================
+# DEAN FINANCES
+# ============================================================
+@login_required
+def dean_finances(request):
+    if not (request.user.is_dean or request.user.is_director or request.user.is_admin_user):
+        raise PermissionDenied(_("Page réservée au doyen ou directeur."))
+    from datetime import date as d
+    from .models import Payslip
+    from django.db.models import Sum
+
+    today = d.today()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    payslips = Payslip.objects.filter(year=year, month=month).select_related("teacher")
+    paid = payslips.filter(status=Payslip.Status.PAID)
+    pending = payslips.filter(status=Payslip.Status.PENDING)
+
+    stats = {
+        "total_paid": paid.aggregate(t=Sum("total_amount"))["t"] or 0,
+        "total_pending": pending.aggregate(t=Sum("total_amount"))["t"] or 0,
+        "count_paid": paid.count(),
+        "count_pending": pending.count(),
+    }
+
+    return render(request, "academics/dean_finances.html", {
+        "payslips": payslips,
+        "year": year,
+        "month": month,
+        "stats": stats,
+    })
+
+
+# ============================================================
+# NOTIFICATIONS
+# ============================================================
 @login_required
 def notifications_list(request):
     from .models import Notification
@@ -527,112 +649,3 @@ def notification_open(request, pk):
     if notif.url:
         return redirect(notif.url)
     return redirect("academics:notifications_list")
-
-
-# ================= Payslips (Fiches de paie) =================
-@login_required
-def accountant_payslips(request):
-    """لوحة المحاسب — كشوف الرواتب."""
-    _require_accountant(request.user)
-    from datetime import date
-    from .models import Payslip
-    from .services import generate_monthly_payslips
-
-    today = date.today()
-    year = int(request.GET.get("year", today.year))
-    month = int(request.GET.get("month", today.month))
-
-    # توليد الكشوف (إذا لم تكن موجودة)
-    if request.method == "POST" and request.POST.get("action") == "generate":
-        try:
-            generate_monthly_payslips(year=year, month=month)
-            messages.success(request, _("Fiches générées."))
-        except Exception as e:
-            messages.error(request, str(e))
-        return redirect(f"{request.path}?year={year}&month={month}")
-
-    payslips = Payslip.objects.filter(year=year, month=month).select_related(
-        "teacher", "paid_by",
-    ).order_by("teacher__display_name_fr")
-
-    total_paid = sum(
-        p.total_amount for p in payslips if p.status == Payslip.Status.PAID
-    )
-    total_pending = sum(
-        p.total_amount for p in payslips if p.status == Payslip.Status.PENDING
-    )
-
-    return render(request, "academics/accountant_payslips.html", {
-        "payslips": payslips,
-        "year": year,
-        "month": month,
-        "total_paid": total_paid,
-        "total_pending": total_pending,
-    })
-
-
-@login_required
-def accountant_payslip_mark_paid(request, pk):
-    """تأكيد دفع كشف راتب."""
-    _require_accountant(request.user)
-    from .models import Payslip
-    from .services import mark_payslip_as_paid
-
-    p = get_object_or_404(Payslip, pk=pk)
-    if request.method == "POST":
-        try:
-            mark_payslip_as_paid(payslip=p, user=request.user)
-            messages.success(request, _("Fiche marquée payée."))
-        except Exception as e:
-            messages.error(request, str(e))
-    return redirect("academics:accountant_payslips")
-
-
-@login_required
-def accountant_payslip_mark_pending(request, pk):
-    """إرجاع كشف إلى حالة الانتظار (تصحيح)."""
-    _require_accountant(request.user)
-    from .models import Payslip
-    from .services import mark_payslip_as_pending
-
-    p = get_object_or_404(Payslip, pk=pk)
-    if request.method == "POST":
-        try:
-            mark_payslip_as_pending(payslip=p, user=request.user)
-            messages.success(request, _("Fiche remise en attente."))
-        except Exception as e:
-            messages.error(request, str(e))
-    return redirect("academics:accountant_payslips")
-
-
-@login_required
-def dean_finances(request):
-    """لوحة العميد — الحالة المالية."""
-    _require_dean(request.user)
-    from datetime import date
-    from .models import Payslip
-    from django.db.models import Sum, Count
-
-    today = date.today()
-    year = int(request.GET.get("year", today.year))
-    month = int(request.GET.get("month", today.month))
-
-    payslips = Payslip.objects.filter(year=year, month=month).select_related("teacher")
-
-    paid = payslips.filter(status=Payslip.Status.PAID)
-    pending = payslips.filter(status=Payslip.Status.PENDING)
-
-    stats = {
-        "total_paid": paid.aggregate(t=Sum("total_amount"))["t"] or 0,
-        "total_pending": pending.aggregate(t=Sum("total_amount"))["t"] or 0,
-        "count_paid": paid.count(),
-        "count_pending": pending.count(),
-    }
-
-    return render(request, "academics/dean_finances.html", {
-        "payslips": payslips,
-        "year": year,
-        "month": month,
-        "stats": stats,
-    })
-
