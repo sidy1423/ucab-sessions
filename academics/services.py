@@ -315,3 +315,180 @@ def compute_levels_grand_total(*, date_from=None, date_to=None):
         "remaining_hours": max(0, total_planned_hours - completed_hours),
         "percent": round(100 * completed_hours / total_planned_hours) if total_planned_hours else 0,
     }
+
+
+def compute_teacher_salary(*, teacher, date_from=None, date_to=None):
+    """
+    يحسب أجر المعلم بناءً على ساعاته المعتمدة × سعر المستوى.
+    يعيد:
+        {
+            "teacher_name": str,
+            "total_hours": Decimal,
+            "total_amount": Decimal,
+            "details": [
+                {"level": str, "hours": Decimal, "rate": Decimal, "amount": Decimal},
+                ...
+            ]
+        }
+    """
+    from decimal import Decimal
+
+    qs = Session.objects.filter(
+        teacher=teacher,
+        status=Session.Status.APPROVED,
+    )
+    if date_from:
+        qs = qs.filter(date__gte=date_from)
+    if date_to:
+        qs = qs.filter(date__lte=date_to)
+
+    # تجميع حسب المستوى
+    by_level = {}
+    for session in qs.select_related("level"):
+        level_id = session.level_id
+        if level_id not in by_level:
+            by_level[level_id] = {
+                "level": session.level.name_fr,
+                "hours": Decimal(0),
+                "rate": Decimal(session.level.hourly_rate),
+                "amount": Decimal(0),
+            }
+        by_level[level_id]["hours"] += Decimal(session.duration_hours)
+
+    # احسب المبلغ لكل مستوى
+    total_hours = Decimal(0)
+    total_amount = Decimal(0)
+    for info in by_level.values():
+        info["amount"] = info["hours"] * info["rate"]
+        total_hours += info["hours"]
+        total_amount += info["amount"]
+
+    return {
+        "teacher_name": str(teacher),
+        "teacher_id": teacher.id,
+        "total_hours": total_hours,
+        "total_amount": total_amount,
+        "details": list(by_level.values()),
+    }
+
+
+def compute_all_teachers_salaries(*, date_from=None, date_to=None):
+    """يحسب أجر كل المعلمين."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    return [
+        compute_teacher_salary(teacher=t, date_from=date_from, date_to=date_to)
+        for t in User.objects.filter(role=User.Role.TEACHER)
+    ]
+
+
+def compute_total_salaries(*, date_from=None, date_to=None):
+    """إجمالي رواتب كل المعلمين."""
+    from decimal import Decimal
+    salaries = compute_all_teachers_salaries(date_from=date_from, date_to=date_to)
+    total = Decimal(0)
+    for s in salaries:
+        total += s["total_amount"]
+    return total
+
+
+# ============================================================
+# PAYSLIPS — Fiches de paie mensuelles
+# ============================================================
+def generate_payslip(*, teacher, year, month):
+    """
+    يولّد كشف راتب لمعلم/شهر بناءً على الحصص المعتمدة.
+    - إذا وُجد كشف سابق (pending): يُحدّث بالأرقام الجديدة.
+    - إذا كان مدفوعًا: يُرفض (لا يُعدّل).
+    """
+    from calendar import monthrange
+    from datetime import date
+    from decimal import Decimal
+    from django.utils import timezone
+    from .models import Payslip
+
+    # نطاق الشهر
+    _, last_day = monthrange(year, month)
+    date_from = date(year, month, 1)
+    date_to = date(year, month, last_day)
+
+    # احسب الساعات والمبلغ
+    salary = compute_teacher_salary(
+        teacher=teacher, date_from=date_from, date_to=date_to,
+    )
+
+    payslip, created = Payslip.objects.get_or_create(
+        teacher=teacher, year=year, month=month,
+        defaults={"total_hours": 0, "total_amount": 0},
+    )
+
+    if payslip.status == Payslip.Status.PAID:
+        raise ValueError(
+            f"Fiche de paie déjà payée pour {teacher} — {month:02d}/{year}"
+        )
+
+    payslip.total_hours = salary["total_hours"]
+    payslip.total_amount = salary["total_amount"]
+    payslip.save()
+
+    return payslip, created
+
+
+def generate_monthly_payslips(*, year, month):
+    """يولّد كشوف كل المعلمين لشهر معين."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    results = []
+    for teacher in User.objects.filter(role=User.Role.TEACHER):
+        try:
+            payslip, created = generate_payslip(
+                teacher=teacher, year=year, month=month,
+            )
+            results.append((payslip, created))
+        except ValueError as e:
+            # تجاوز المعلمين المدفوعين مسبقًا
+            results.append((str(e), False))
+
+    return results
+
+
+def mark_payslip_as_paid(*, payslip, user):
+    """تأكيد دفع كشف راتب."""
+    from django.utils import timezone
+    from .models import Payslip
+
+    if not (user.is_accountant or user.is_admin_user):
+        raise PermissionDenied(_("Seul le comptable peut confirmer le paiement."))
+
+    if payslip.status == Payslip.Status.PAID:
+        return payslip  # مدفوع مسبقًا
+
+    payslip.status = Payslip.Status.PAID
+    payslip.paid_at = timezone.now()
+    payslip.paid_by = user
+    payslip.save()
+
+    # إشعار للمدير والعميد
+    try:
+        from .services_notifications import notify_payslip_paid
+        notify_payslip_paid(payslip)
+    except Exception:
+        pass
+
+    return payslip
+
+
+def mark_payslip_as_pending(*, payslip, user):
+    """إرجاع كشف راتب إلى حالة الانتظار (تصحيح خطأ)."""
+    from .models import Payslip
+
+    if not (user.is_admin_user or user.is_accountant):
+        raise PermissionDenied(_("Action réservée au comptable ou administrateur."))
+
+    payslip.status = Payslip.Status.PENDING
+    payslip.paid_at = None
+    payslip.paid_by = None
+    payslip.save()
+    return payslip
+

@@ -232,5 +232,44 @@
     </tfoot>
   {% endif %}
 </table>
+{# ============ قسم الرواتب ============ #}
+<h4 class="mt-4">💰 {% trans "Salaires par enseignant" %}</h4>
+<div class="alert alert-info">
+  <strong>{% trans "Total général" %}:</strong>
+  {{ total_salaries|floatformat:0 }} FCFA
+</div>
+
+<table class="table table-bordered table-sm">
+  <thead class="table-warning">
+    <tr>
+      <th>{% trans "Enseignant" %}</th>
+      <th>{% trans "Niveau" %}</th>
+      <th class="text-center">{% trans "Heures" %}</th>
+      <th class="text-center">{% trans "Tarif/h" %}</th>
+      <th class="text-center">{% trans "Montant" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for sal in salaries %}
+      {% for detail in sal.details %}
+        <tr>
+          <td>{% if forloop.first %}{{ sal.teacher_name }}{% endif %}</td>
+          <td>{{ detail.level }}</td>
+          <td class="text-center">{{ detail.hours }}</td>
+          <td class="text-center">{{ detail.rate|floatformat:0 }} FCFA</td>
+          <td class="text-center fw-bold text-success">{{ detail.amount|floatformat:0 }} FCFA</td>
+        </tr>
+      {% endfor %}
+      <tr class="table-light fw-bold">
+        <td colspan="2">{% trans "Total" %} {{ sal.teacher_name }}</td>
+        <td class="text-center">{{ sal.total_hours }}</td>
+        <td></td>
+        <td class="text-center text-primary">{{ sal.total_amount|floatformat:0 }} FCFA</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center">{% trans "Aucune donnée." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 {% endblock %}

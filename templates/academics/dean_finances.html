@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Finances" %}{% endblock %}
+{% block content %}
+<h3>💰 {% trans "État financier — Doyen" %}</h3>
+
+<form method="get" class="row g-2 mb-4">
+  <div class="col-auto">
+    <label class="form-label">{% trans "Année" %}</label>
+    <input type="number" name="year" value="{{ year }}" class="form-control">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Mois" %}</label>
+    <input type="number" name="month" value="{{ month }}" min="1" max="12" class="form-control">
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-primary">🔍 {% trans "Voir" %}</button>
+  </div>
+</form>
+
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-center border-success">
+      <div class="card-body">
+        <h6 class="text-success">{% trans "Total payé" %}</h6>
+        <h3 class="text-success">{{ stats.total_paid|floatformat:0 }} FCFA</h3>
+        <small>{{ stats.count_paid }} {% trans "enseignants" %}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center border-warning">
+      <div class="card-body">
+        <h6 class="text-warning">{% trans "Reste à payer" %}</h6>
+        <h3 class="text-warning">{{ stats.total_pending|floatformat:0 }} FCFA</h3>
+        <small>{{ stats.count_pending }} {% trans "enseignants" %}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center border-primary">
+      <div class="card-body">
+        <h6 class="text-primary">{% trans "Total général" %}</h6>
+        <h3 class="text-primary">
+          {{ stats.total_paid|add:stats.total_pending|floatformat:0 }} FCFA
+        </h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h4>{% trans "Détail par enseignant" %}</h4>
+<table class="table table-bordered">
+  <thead class="table-light">
+    <tr>
+      <th>{% trans "Enseignant" %}</th>
+      <th class="text-center">{% trans "Heures" %}</th>
+      <th class="text-center">{% trans "Montant" %}</th>
+      <th class="text-center">{% trans "Statut" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in payslips %}
+      <tr>
+        <td>{{ p.teacher }}</td>
+        <td class="text-center">{{ p.total_hours }}</td>
+        <td class="text-center fw-bold">{{ p.total_amount|floatformat:0 }} FCFA</td>
+        <td class="text-center">
+          {% if p.status == "paid" %}
+            <span class="badge bg-success">✅ {% trans "Payé" %}</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">⏳ {% trans "En attente" %}</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="text-center">{% trans "Aucune donnée pour ce mois." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="mt-4">
+  <a href="{% url 'academics:dean_dashboard' %}" class="btn btn-outline-secondary">
+    ← {% trans "Retour au tableau de bord" %}
+  </a>
+</div>
+{% endblock %}

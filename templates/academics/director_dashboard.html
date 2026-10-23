@@ -3,6 +3,11 @@
 {% block title %}{% trans "Directeur des études" %}{% endblock %}
 {% block content %}
 <h3>{% trans "Tableau de bord — Directeur des études" %}</h3>
+<div class="mb-3">
+  <a href="{% url 'academics:accountant_payslips' %}" class="btn btn-success">
+    💰 {% trans "Fiches de paie mensuelles" %}
+  </a>
+</div>
 
 {# بطاقات إحصائية #}
 <div class="row mb-4">

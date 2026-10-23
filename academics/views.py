@@ -19,7 +19,9 @@ from .services import (
     compute_levels_summary,
     compute_levels_totals,
     compute_teacher_hours,
+    compute_all_teachers_salaries,
     compute_teacher_level_breakdown,
+    compute_total_salaries,
     create_session,
     delete_session,
     reject_session,
@@ -289,6 +291,10 @@ def secretary_assignment_create(request):
             a = form.save(commit=False)
             a.created_by = request.user
             a.save()
+            # إشعار المدير إذا كان السكرتير هو من أنشأ
+            if request.user.is_secretary:
+                from .services_notifications import notify_assignment_created_by_secretary
+                notify_assignment_created_by_secretary(a, request.user)
             messages.success(request, _("Affectation créée par le secrétaire."))
             return redirect("academics:secretary_dashboard")
     else:
@@ -412,11 +418,14 @@ def accountant_dashboard(request):
     levels_summary = compute_levels_summary(date_from=df_p, date_to=dt_p)
     grand_total = compute_levels_grand_total(date_from=df_p, date_to=dt_p)
     breakdown = compute_teacher_level_breakdown(date_from=df_p, date_to=dt_p)
+    salaries = compute_all_teachers_salaries(date_from=df_p, date_to=dt_p)
+    total_salaries = compute_total_salaries(date_from=df_p, date_to=dt_p)
 
     if f_teacher:
         try:
             f_teacher_id = int(f_teacher)
             breakdown = [b for b in breakdown if b["teacher"].id == f_teacher_id]
+            salaries = [s for s in salaries if s["teacher_id"] == f_teacher_id]
         except (ValueError, TypeError):
             pass
     if f_level:
@@ -455,6 +464,8 @@ def accountant_dashboard(request):
         "grand_total": grand_total,
         "breakdown": breakdown,
         "breakdown_totals": breakdown_totals,
+        "salaries": salaries,
+        "total_salaries": total_salaries,
         "teachers_list": teachers_list,
         "levels_list": levels_list,
         "subjects_list": subjects_list,
@@ -516,3 +527,112 @@ def notification_open(request, pk):
     if notif.url:
         return redirect(notif.url)
     return redirect("academics:notifications_list")
+
+
+# ================= Payslips (Fiches de paie) =================
+@login_required
+def accountant_payslips(request):
+    """لوحة المحاسب — كشوف الرواتب."""
+    _require_accountant(request.user)
+    from datetime import date
+    from .models import Payslip
+    from .services import generate_monthly_payslips
+
+    today = date.today()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    # توليد الكشوف (إذا لم تكن موجودة)
+    if request.method == "POST" and request.POST.get("action") == "generate":
+        try:
+            generate_monthly_payslips(year=year, month=month)
+            messages.success(request, _("Fiches générées."))
+        except Exception as e:
+            messages.error(request, str(e))
+        return redirect(f"{request.path}?year={year}&month={month}")
+
+    payslips = Payslip.objects.filter(year=year, month=month).select_related(
+        "teacher", "paid_by",
+    ).order_by("teacher__display_name_fr")
+
+    total_paid = sum(
+        p.total_amount for p in payslips if p.status == Payslip.Status.PAID
+    )
+    total_pending = sum(
+        p.total_amount for p in payslips if p.status == Payslip.Status.PENDING
+    )
+
+    return render(request, "academics/accountant_payslips.html", {
+        "payslips": payslips,
+        "year": year,
+        "month": month,
+        "total_paid": total_paid,
+        "total_pending": total_pending,
+    })
+
+
+@login_required
+def accountant_payslip_mark_paid(request, pk):
+    """تأكيد دفع كشف راتب."""
+    _require_accountant(request.user)
+    from .models import Payslip
+    from .services import mark_payslip_as_paid
+
+    p = get_object_or_404(Payslip, pk=pk)
+    if request.method == "POST":
+        try:
+            mark_payslip_as_paid(payslip=p, user=request.user)
+            messages.success(request, _("Fiche marquée payée."))
+        except Exception as e:
+            messages.error(request, str(e))
+    return redirect("academics:accountant_payslips")
+
+
+@login_required
+def accountant_payslip_mark_pending(request, pk):
+    """إرجاع كشف إلى حالة الانتظار (تصحيح)."""
+    _require_accountant(request.user)
+    from .models import Payslip
+    from .services import mark_payslip_as_pending
+
+    p = get_object_or_404(Payslip, pk=pk)
+    if request.method == "POST":
+        try:
+            mark_payslip_as_pending(payslip=p, user=request.user)
+            messages.success(request, _("Fiche remise en attente."))
+        except Exception as e:
+            messages.error(request, str(e))
+    return redirect("academics:accountant_payslips")
+
+
+@login_required
+def dean_finances(request):
+    """لوحة العميد — الحالة المالية."""
+    _require_dean(request.user)
+    from datetime import date
+    from .models import Payslip
+    from django.db.models import Sum, Count
+
+    today = date.today()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    payslips = Payslip.objects.filter(year=year, month=month).select_related("teacher")
+
+    paid = payslips.filter(status=Payslip.Status.PAID)
+    pending = payslips.filter(status=Payslip.Status.PENDING)
+
+    stats = {
+        "total_paid": paid.aggregate(t=Sum("total_amount"))["t"] or 0,
+        "total_pending": pending.aggregate(t=Sum("total_amount"))["t"] or 0,
+        "count_paid": paid.count(),
+        "count_pending": pending.count(),
+    }
+
+    return render(request, "academics/dean_finances.html", {
+        "payslips": payslips,
+        "year": year,
+        "month": month,
+        "stats": stats,
+    })
+

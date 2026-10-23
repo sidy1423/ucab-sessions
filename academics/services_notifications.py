@@ -109,3 +109,44 @@ def notify_late_submission(session):
             url=url,
         )
 
+
+def notify_assignment_created_by_secretary(assignment, secretary):
+    """إشعار المدير عند إنشاء السكرتير إسنادًا."""
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+    User = get_user_model()
+
+    directors = User.objects.filter(role=User.Role.DIRECTOR)
+    message = (
+        f"Le secrétaire {secretary.display_name_fr or secretary.username} "
+        f"a créé une affectation : {assignment.subject.name_fr} "
+        f"({assignment.level.name_fr}) pour {assignment.teacher.display_name_fr}"
+    )
+    for d in directors:
+        _create_notification(
+            recipient=d,
+            notif_type=Notification.Type.ASSIGNMENT_CREATED,
+            message=message,
+            url=reverse("academics:director_dashboard"),
+        )
+
+
+def notify_payslip_paid(payslip):
+    """إشعار المدير والعميد عند تأكيد دفع كشف راتب."""
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+    User = get_user_model()
+
+    recipients = User.objects.filter(role__in=[User.Role.DIRECTOR, User.Role.DEAN])
+    message = (
+        f"Fiche de paie payée : {payslip.teacher.display_name_fr} — "
+        f"{payslip.period_label} — {payslip.total_amount} FCFA"
+    )
+    for r in recipients:
+        _create_notification(
+            recipient=r,
+            notif_type=Notification.Type.PAYSLIP_PAID,
+            message=message,
+            url=reverse("academics:dean_dashboard"),
+        )
+

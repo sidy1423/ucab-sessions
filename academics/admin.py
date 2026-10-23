@@ -1,7 +1,10 @@
 from django.contrib import admin
-from .models import Level, Subject, TeachingAssignment, Session
+from .models import Level, Subject, TeachingAssignment, Session, Payslip
 
-admin.site.register(Level)
+@admin.register(Level)
+class LevelAdmin(admin.ModelAdmin):
+    list_display = ("name_fr", "name_ar", "order", "hourly_rate")
+    list_editable = ("hourly_rate",)
 admin.site.register(Subject)
 
 
@@ -20,3 +23,12 @@ class SessionAdmin(admin.ModelAdmin):
     list_filter  = ("status", "level", "subject")
     search_fields = ("teacher__display_name_fr", "topic")
     readonly_fields = ("created_at", "updated_at", "locked_at")
+
+
+@admin.register(Payslip)
+class PayslipAdmin(admin.ModelAdmin):
+    list_display = ("teacher", "year", "month", "total_hours", "total_amount", "status", "paid_at")
+    list_filter = ("status", "year", "month")
+    search_fields = ("teacher__display_name_fr",)
+    readonly_fields = ("created_at", "updated_at", "paid_at")
+

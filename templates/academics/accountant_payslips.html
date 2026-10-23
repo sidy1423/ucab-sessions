@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Fiches de paie" %}{% endblock %}
+{% block content %}
+<h3>💰 {% trans "Fiches de paie" %}</h3>
+
+<form method="get" class="row g-2 mb-4">
+  <div class="col-auto">
+    <label class="form-label">{% trans "Année" %}</label>
+    <input type="number" name="year" value="{{ year }}" class="form-control">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">{% trans "Mois" %}</label>
+    <select name="month" class="form-select">
+      {% for m in "123456789012"|make_list %}
+        <option value="{{ forloop.counter }}" {% if forloop.counter == month %}selected{% endif %}>
+          {{ forloop.counter }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto align-self-end">
+    <button class="btn btn-primary">🔍 {% trans "Voir" %}</button>
+  </div>
+</form>
+
+<form method="post" class="mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="generate">
+  <button class="btn btn-success">
+    ➕ {% trans "Générer les fiches du mois" %}
+  </button>
+</form>
+
+<div class="row mb-4">
+  <div class="col-md-6">
+    <div class="card text-center border-success">
+      <div class="card-body">
+        <h6 class="text-success">{% trans "Payé" %}</h6>
+        <h3 class="text-success">{{ total_paid|floatformat:0 }} FCFA</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card text-center border-warning">
+      <div class="card-body">
+        <h6 class="text-warning">{% trans "En attente" %}</h6>
+        <h3 class="text-warning">{{ total_pending|floatformat:0 }} FCFA</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="table table-bordered">
+  <thead class="table-light">
+    <tr>
+      <th>{% trans "Enseignant" %}</th>
+      <th class="text-center">{% trans "Heures" %}</th>
+      <th class="text-center">{% trans "Montant" %}</th>
+      <th class="text-center">{% trans "Statut" %}</th>
+      <th>{% trans "Actions" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in payslips %}
+      <tr>
+        <td>{{ p.teacher }}</td>
+        <td class="text-center">{{ p.total_hours }}</td>
+        <td class="text-center fw-bold">{{ p.total_amount|floatformat:0 }} FCFA</td>
+        <td class="text-center">
+          {% if p.status == "paid" %}
+            <span class="badge bg-success">✅ {% trans "Payé" %}</span>
+            <br><small class="text-muted">{{ p.paid_at|date:"Y-m-d H:i" }}</small>
+          {% else %}
+            <span class="badge bg-warning text-dark">⏳ {% trans "En attente" %}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if p.status == "pending" %}
+            <form method="post" action="{% url 'academics:accountant_payslip_mark_paid' p.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-success">✅ {% trans "Marquer payé" %}</button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'academics:accountant_payslip_mark_pending' p.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-warning">↩️ {% trans "Annuler paiement" %}</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center">{% trans "Aucune fiche pour ce mois." %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="mt-4">
+  <a href="{% url 'academics:accountant_dashboard' %}" class="btn btn-outline-secondary">
+    ← {% trans "Retour au tableau de bord" %}
+  </a>
+</div>
+{% endblock %}

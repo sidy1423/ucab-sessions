@@ -35,4 +35,11 @@ urlpatterns = [
     # الإشعارات
     path("notifications/", views.notifications_list, name="notifications_list"),
     path("notifications/<int:pk>/open/", views.notification_open, name="notification_open"),
+    # Fiches de paie
+    path("accountant/payslips/", views.accountant_payslips, name="accountant_payslips"),
+    path("accountant/payslips/<int:pk>/paid/", views.accountant_payslip_mark_paid, name="accountant_payslip_mark_paid"),
+    path("accountant/payslips/<int:pk>/pending/", views.accountant_payslip_mark_pending, name="accountant_payslip_mark_pending"),
+
+    # Finances du doyen
+    path("dean/finances/", views.dean_finances, name="dean_finances"),
 ]

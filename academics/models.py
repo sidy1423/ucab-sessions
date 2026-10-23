@@ -9,10 +9,15 @@ from django.utils.translation import gettext_lazy as _
 
 
 class Level(models.Model):
-    """Niveau / المستوى الدراسي."""
+    """Niveau / المستوى الدراسي مع سعر الساعة."""
     name_fr = models.CharField(_("Nom (français)"), max_length=100, unique=True)
     name_ar = models.CharField(_("الاسم بالعربية"), max_length=100, unique=True)
     order   = models.PositiveIntegerField(_("Ordre"), default=0)
+    hourly_rate = models.DecimalField(
+        _("Tarif horaire (FCFA)"),
+        max_digits=10, decimal_places=2, default=5000,
+        help_text=_("Tarif par heure pour ce niveau (FCFA)"),
+    )
 
     class Meta:
         ordering = ["order", "name_fr"]
@@ -258,6 +263,8 @@ class Notification(models.Model):
         SESSION_APPROVED  = "session_approved",  _("Séance approuvée")
         SESSION_REJECTED  = "session_rejected",  _("Séance rejetée")
         SESSION_DELETED   = "session_deleted",   _("Séance supprimée")
+        ASSIGNMENT_CREATED = "assignment_created", _("Affectation créée")
+        PAYSLIP_PAID = "payslip_paid", _("Fiche de paie payée")
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -284,3 +291,67 @@ class Notification(models.Model):
         if not self.is_read:
             self.is_read = True
             self.save(update_fields=["is_read"])
+
+
+class Payslip(models.Model):
+    """
+    Fiche de paie mensuelle pour un enseignant.
+    Calculée à partir des séances approuvées dans le mois.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("En attente de paiement")
+        PAID = "paid", _("Payé")
+
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="payslips", verbose_name=_("Enseignant"),
+    )
+    year = models.PositiveIntegerField(_("Année"))
+    month = models.PositiveIntegerField(_("Mois (1-12)"))
+    total_hours = models.DecimalField(
+        _("Total heures"), max_digits=10, decimal_places=2, default=0,
+    )
+    total_amount = models.DecimalField(
+        _("Montant total (FCFA)"), max_digits=12, decimal_places=2, default=0,
+    )
+    status = models.CharField(
+        _("Statut"), max_length=20,
+        choices=Status.choices, default=Status.PENDING,
+    )
+    paid_at = models.DateTimeField(_("Payé le"), null=True, blank=True)
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="paid_payslips",
+        verbose_name=_("Payé par"),
+    )
+    notes = models.TextField(_("Notes"), blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-year", "-month", "teacher__display_name_fr"]
+        verbose_name = _("Fiche de paie")
+        verbose_name_plural = _("Fiches de paie")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "year", "month"],
+                name="uniq_payslip_teacher_month",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["year", "month", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.teacher} - {self.month:02d}/{self.year} - {self.total_amount} FCFA [{self.get_status_display()}]"
+
+    @property
+    def period_label(self):
+        """عرض الشهر بالاسم."""
+        months_fr = [
+            "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+            "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+        ]
+        return f"{months_fr[self.month]} {self.year}"
+
